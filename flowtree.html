@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>flowtree :: "Dynamic Island for PC"</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#121a30; --panel2:#0e1526; --line:#243049;
+    --text:#dbe4ff; --muted:#8b9ac7; --accent:#a78bfa; --green:#4ade80;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+    font:13px/1.45 "Segoe UI",system-ui,sans-serif}
+  #cv{position:fixed;inset:0;display:block;cursor:grab;touch-action:none}
+  #cv.panning,#cv.dragging{cursor:grabbing}
+  header{position:fixed;top:0;left:0;right:0;height:46px;z-index:5;
+    display:flex;align-items:center;gap:14px;padding:0 14px;
+    background:linear-gradient(90deg,var(--panel2),var(--panel));
+    border-bottom:1px solid var(--line)}
+  header b{color:var(--accent);font-weight:700;letter-spacing:.3px}
+  header .sub{color:var(--muted);font-size:12px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  header .stats{margin-left:auto;display:flex;gap:14px;color:var(--muted);font-size:12px}
+  header .stats span b{color:var(--text);font-weight:600}
+  #side{position:fixed;top:46px;bottom:0;left:0;width:286px;z-index:4;
+    background:var(--panel);border-right:1px solid var(--line);
+    display:flex;flex-direction:column}
+  #side .search{padding:10px;border-bottom:1px solid var(--line)}
+  #side input{width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);outline:none}
+  #side input:focus{border-color:var(--accent)}
+  #list{flex:1;overflow:auto;padding:6px 0}
+  .team{display:flex;align-items:center;gap:6px;margin:8px 10px 3px;font-size:10.5px;
+    letter-spacing:.8px;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .team em{margin-left:auto;font-style:normal;color:var(--accent);font-size:10px}
+  .row{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:7px;
+    cursor:pointer;user-select:none}
+  .row:hover{background:var(--panel2)}
+  .row.active{background:#1d2750}
+  .dot{width:10px;height:10px;border-radius:50%;flex:none}
+  .row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row.planned{opacity:.55}
+  .row .st{color:var(--muted);font-size:11px;flex:none}
+  .legend{position:fixed;bottom:12px;right:12px;z-index:5;max-width:340px;
+    background:rgba(14,21,38,.94);border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;font-size:11px;color:var(--muted);backdrop-filter:blur(4px)}
+  .legend h5{color:var(--text);margin-bottom:6px;font-weight:600;font-size:12px}
+  .lg{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:4px}
+  .lg span.dot{width:9px;height:9px}
+  .lg .edge{width:18px;height:0;border-top:2px solid}
+  .lg .bidir{width:30px;height:12px;position:relative;border-top:2px solid}
+  .lg .bidir:before,.lg .bidir:after{content:"";position:absolute;top:-2px;
+    width:10px;height:10px;border-top:2px solid;border-right:2px solid;
+    transform:rotate(45deg)}
+  .lg .bidir:before{left:-2px;transform:rotate(-135deg)}
+  .lg .bidir:after{right:-2px}
+  .lg.planned .dot{border:1px dashed var(--muted);background:transparent}
+  .pill{display:inline-block;padding:0 7px;margin:2px 3px 0 0;border-radius:6px;
+    font-size:10.5px;background:var(--panel2);border:1px solid var(--line)}
+  #rst{position:fixed;bottom:12px;left:12px;z-index:5;cursor:pointer;
+    background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:8px;padding:6px 10px;font-size:11px;opacity:.85}
+  #rst:hover{opacity:1;border-color:var(--accent)}
+  #ver{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:5;
+    color:rgba(139,154,199,.55);font-size:10.5px;pointer-events:none}
+  #tip{position:fixed;z-index:6;pointer-events:none;max-width:380px;display:none;
+    background:rgba(13,19,40,.97);border:1px solid var(--line);border-radius:9px;
+    padding:9px 12px;font-size:12px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  #tip b{color:var(--text);font-size:12.5px}
+  #tip .kv{color:var(--muted);margin-top:3px;word-break:break-word}
+  #tip .kv b{color:#c7d2fe;font-weight:600}
+  #tip .grp{color:#8aa0d8;letter-spacing:.5px;text-transform:uppercase;
+    font-size:10px;font-weight:700;margin-top:5px}
+  #tabs{display:flex;gap:6px;margin-left:10px}
+  #tabs .tb,#traffic .tb{background:transparent;border:1px solid var(--line);
+    color:var(--muted);padding:5px 10px;border-radius:7px;cursor:pointer;
+    font-size:11.5px;font-family:inherit}
+  #tabs .tb:hover{color:var(--text);border-color:var(--accent)}
+  #tabs .tb.act,#traffic .tb.act{background:var(--panel2);color:var(--text);
+    border-color:var(--accent);box-shadow:0 0 0 1px rgba(167,139,250,.25)}
+  #traffic{position:fixed;top:46px;left:286px;right:0;bottom:0;z-index:4;
+    background:var(--bg);display:flex;flex-direction:column;padding:12px 18px;overflow:hidden}
+  #traffic.hidden{display:none}
+  #traffic .ttabs{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  #traffic .ttabs .ttsum{color:var(--muted);font-size:11.5px;margin-left:8px}
+  #traffic .ttabs .ttsum b{color:var(--text)}
+  #tlist{flex:1;overflow:auto;padding-bottom:16px}
+  .trow{display:grid;grid-template-columns:38px 1fr 130px 150px;gap:10px;
+    align-items:center;padding:6px 10px;border-radius:8px;cursor:pointer;
+    border:1px solid transparent}
+  .trow:hover{background:var(--panel2);border-color:var(--line)}
+  .trow .rank{color:var(--muted);font-size:11px;text-align:right;font-weight:700}
+  .trow .pid{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}
+  .trow .pid .role{font-size:10px;color:var(--muted);margin-left:6px}
+  .trow .bars{display:flex;flex-direction:column;gap:3px}
+  .trow .bar{height:7px;background:var(--panel2);border-radius:4px;overflow:hidden;position:relative}
+  .trow .bar i{position:absolute;inset:0;background:var(--accent);opacity:.85;width:0}
+  .trow .bar.out i{background:#4ade80}
+  .trow .bar.in i{background:#f472b6}
+  .trow .val{display:flex;gap:10px;font-size:11px;color:var(--muted);text-align:right}
+  .trow .val b{color:var(--text)}
+  .trow .val .ot{color:#4ade80}.trow .val .it{color:#f472b6}
+  @media (max-width:720px){ #side{width:220px} .legend{display:none}
+    #traffic{left:220px} .trow{grid-template-columns:30px 1fr 110px;gap:6px}
+    .trow .val{display:none} }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<header>
+  <b>flowtree</b>
+  <div id="tabs">
+    <button id="tabGraph" class="tb act" title="Network / structure graph">Mạng lưới</button>
+    <button id="tabTraffic" class="tb" title="Ingoing / outgoing traffic per file">Traffic ▸▸▸</button>
+  </div>
+  <span class="sub" id="pname">"Dynamic Island for PC"</span>
+  <div class="stats">
+    <span id="sTraf"><b>-</b> traffic</span>
+    <span id="sNode"><b>-</b> nodes</span>
+    <span id="sEdge"><b>-</b> links</span>
+    <span id="sPlan"><b>-</b> planned</span>
+    <span id="sSym"><b>-</b> symbols</span>
+    <span id="sTime">-</span>
+  </div>
+</header>
+<aside id="side">
+  <div class="search"><input id="q" type="text" placeholder="Find a file..."></div>
+  <div id="list"></div>
+</aside>
+<div id="traffic" class="hidden">
+  <div class="ttabs">
+    <button id="ttIn" class="tb act">☛ Ingoing</button>
+    <button id="ttOut" class="tb">☚ Outgoing</button>
+    <button id="ttTotal" class="tb">Total</button>
+    <span class="ttsum">sum <b id="ttSum">-</b> · top picks below</span>
+  </div>
+  <div id="tlist"></div>
+</div>
+<div id="tip"></div>
+<div class="legend" id="legend"></div>
+<button id="rst" title="Reset view (double-click the empty canvas too)">reset view</button>
+<div id="ver"></div>
+<script>
+const FT = {"exporter": "4.0.0", "project": "Dynamic Island for PC", "generated": "2026-09-15 21:09", "counts": {"nodes": 37, "edges": 37, "planned": 6, "symbols": 48, "traffic": 142}, "roles": ["entry", "api", "backend", "frontend", "design", "data", "model", "module", "config", "docs", "test", "util", "other"], "roleColors": {"entry": "#8b5cf6", "api": "#f97316", "backend": "#fb7185", "frontend": "#3b82f6", "design": "#ec4899", "data": "#14b8a6", "model": "#22c55e", "module": "#2dd4bf", "config": "#eab308", "docs": "#94a3b8", "test": "#a855f7", "util": "#06b6d4", "other": "#9ca3af"}, "teams": ["core", "backend", "frontend", "design", "infra", "docs"], "edgeColors": {"import": "#60a5fa", "reference": "#fbbf24", "declared": "#a78bfa"}, "plannedColor": "#9ca3af", "nodes": [{"id": "index.html", "path": "index.html", "name": "index.html", "dir": ".", "role": "frontend", "team": "frontend", "color": "#3b82f6", "status": "implemented", "size": 440, "degree": 1, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 0, "outgoing": 1, "traffic": 1}, {"id": "package-lock.json", "path": "package-lock.json", "name": "package-lock.json", "dir": ".", "role": "config", "team": "infra", "color": "#eab308", "status": "implemented", "size": 55548, "degree": 0, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 0, "outgoing": 0, "traffic": 0}, {"id": "package.json", "path": "package.json", "name": "package.json", "dir": ".", "role": "config", "team": "infra", "color": "#eab308", "status": "implemented", "size": 647, "degree": 1, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 1, "outgoing": 0, "traffic": 1}, {"id": "README.md", "path": "README.md", "name": "README.md", "dir": ".", "role": "docs", "team": "docs", "color": "#94a3b8", "status": "implemented", "size": 1864, "degree": 0, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 0, "outgoing": 0, "traffic": 0}, {"id": "tsconfig.json", "path": "tsconfig.json", "name": "tsconfig.json", "dir": ".", "role": "config", "team": "infra", "color": "#eab308", "status": "implemented", "size": 608, "degree": 0, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 0, "outgoing": 0, "traffic": 0}, {"id": "tsconfig.node.json", "path": "tsconfig.node.json", "name": "tsconfig.node.json", "dir": ".", "role": "config", "team": "infra", "color": "#eab308", "status": "implemented", "size": 256, "degree": 0, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 0, "outgoing": 0, "traffic": 0}, {"id": "vite.config.ts", "path": "vite.config.ts", "name": "vite.config.ts", "dir": ".", "role": "config", "team": "infra", "color": "#eab308", "status": "implemented", "size": 330, "degree": 0, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 0, "outgoing": 0, "traffic": 0}, {"id": "scripts/generate-icons.ps1", "path": "scripts/generate-icons.ps1", "name": "generate-icons.ps1", "dir": "scripts", "role": "module", "team": "core", "color": "#2dd4bf", "status": "implemented", "size": 3440, "degree": 0, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 0, "outgoing": 0, "traffic": 0}, {"id": "src/App.tsx", "path": "src/App.tsx", "name": "App.tsx", "dir": "src", "role": "entry", "team": "core", "color": "#8b5cf6", "status": "implemented", "size": 3534, "degree": 7, "symbols": [{"name": "makeAlert", "kind": "function", "line": 12}, {"name": "App", "kind": "function", "line": 16}], "symbolCount": 2, "desc": "island state machine: collapsed \u2194 expanded", "incoming": 4, "outgoing": 12, "traffic": 16}, {"id": "src/config.ts", "path": "src/config.ts", "name": "config.ts", "dir": "src", "role": "config", "team": "infra", "color": "#eab308", "status": "implemented", "size": 363, "degree": 2, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 4, "outgoing": 0, "traffic": 4}, {"id": "src/main.tsx", "path": "src/main.tsx", "name": "main.tsx", "dir": "src", "role": "entry", "team": "core", "color": "#8b5cf6", "status": "implemented", "size": 305, "degree": 5, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 1, "outgoing": 8, "traffic": 9}, {"id": "src/types.ts", "path": "src/types.ts", "name": "types.ts", "dir": "src", "role": "module", "team": "core", "color": "#2dd4bf", "status": "implemented", "size": 766, "degree": 8, "symbols": [{"name": "SystemStats", "kind": "interface", "line": 1}, {"name": "WeatherData", "kind": "interface", "line": 14}, {"name": "GeoLocation", "kind": "interface", "line": 24}, {"name": "MediaKey", "kind": "type", "line": 31}, {"name": "IslandMode", "kind": "type", "line": 33}, {"name": "Alert", "kind": "interface", "line": 35}], "symbolCount": 6, "desc": "", "incoming": 16, "outgoing": 0, "traffic": 16}, {"id": "src/components/ClockWeather.tsx", "path": "src/components/ClockWeather.tsx", "name": "ClockWeather.tsx", "dir": "src/components", "role": "frontend", "team": "frontend", "color": "#3b82f6", "status": "implemented", "size": 1800, "degree": 3, "symbols": [{"name": "Props", "kind": "interface", "line": 4}, {"name": "pad", "kind": "function", "line": 6}, {"name": "ClockWeather", "kind": "function", "line": 8}], "symbolCount": 3, "desc": "", "incoming": 2, "outgoing": 3, "traffic": 5}, {"id": "src/components/icons.tsx", "path": "src/components/icons.tsx", "name": "icons.tsx", "dir": "src/components", "role": "design", "team": "design", "color": "#ec4899", "status": "implemented", "size": 5005, "degree": 6, "symbols": [{"name": "CpuIcon", "kind": "function", "line": 1}, {"name": "RamIcon", "kind": "function", "line": 8}, {"name": "DiskIcon", "kind": "function", "line": 16}, {"name": "MusicNote", "kind": "function", "line": 23}, {"name": "ChevronDown", "kind": "function", "line": 29}, {"name": "BellIcon", "kind": "function", "line": 35}, {"name": "ZapIcon", "kind": "function", "line": 42}, {"name": "ClockIcon", "kind": "function", "line": 48}, {"name": "XIcon", "kind": "function", "line": 54}, {"name": "PlayIcon", "kind": "function", "line": 60}, {"name": "PauseIcon", "kind": "function", "line": 64}, {"name": "SkipNextIcon", "kind": "function", "line": 68}, {"name": "SkipPrevIcon", "kind": "function", "line": 72}, {"name": "VolUpIcon", "kind": "function", "line": 76}, {"name": "VolDownIcon", "kind": "function", "line": 83}, {"name": "MuteIcon", "kind": "function", "line": 90}, {"name": "ClipboardIcon", "kind": "function", "line": 97}, {"name": "CalendarIcon", "kind": "function", "line": 104}], "symbolCount": 18, "desc": "", "incoming": 11, "outgoing": 0, "traffic": 11}, {"id": "src/components/Island.tsx", "path": "src/components/Island.tsx", "name": "Island.tsx", "dir": "src/components", "role": "frontend", "team": "frontend", "color": "#3b82f6", "status": "implemented", "size": 2458, "degree": 8, "symbols": [{"name": "Props", "kind": "interface", "line": 9}, {"name": "Island", "kind": "function", "line": 20}], "symbolCount": 2, "desc": "", "incoming": 2, "outgoing": 14, "traffic": 16}, {"id": "src/components/MusicPanel.tsx", "path": "src/components/MusicPanel.tsx", "name": "MusicPanel.tsx", "dir": "src/components", "role": "frontend", "team": "frontend", "color": "#3b82f6", "status": "implemented", "size": 1836, "degree": 4, "symbols": [{"name": "Props", "kind": "interface", "line": 6}, {"name": "btn", "kind": "function", "line": 8}, {"name": "MusicPanel", "kind": "function", "line": 10}], "symbolCount": 3, "desc": "", "incoming": 2, "outgoing": 6, "traffic": 8}, {"id": "src/components/Notifications.tsx", "path": "src/components/Notifications.tsx", "name": "Notifications.tsx", "dir": "src/components", "role": "frontend", "team": "frontend", "color": "#3b82f6", "status": "implemented", "size": 1275, "degree": 3, "symbols": [{"name": "Props", "kind": "interface", "line": 4}, {"name": "Notifications", "kind": "function", "line": 6}], "symbolCount": 2, "desc": "", "incoming": 2, "outgoing": 4, "traffic": 6}, {"id": "src/components/QuickActions.tsx", "path": "src/components/QuickActions.tsx", "name": "QuickActions.tsx", "dir": "src/components", "role": "frontend", "team": "frontend", "color": "#3b82f6", "status": "implemented", "size": 1696, "degree": 3, "symbols": [{"name": "copy", "kind": "function", "line": 5}, {"name": "QuickActions", "kind": "function", "line": 9}], "symbolCount": 2, "desc": "", "incoming": 2, "outgoing": 4, "traffic": 6}, {"id": "src/components/SystemStats.tsx", "path": "src/components/SystemStats.tsx", "name": "SystemStats.tsx", "dir": "src/components", "role": "frontend", "team": "frontend", "color": "#3b82f6", "status": "implemented", "size": 2289, "degree": 3, "symbols": [{"name": "Props", "kind": "interface", "line": 5}, {"name": "Bar", "kind": "function", "line": 7}, {"name": "SystemStats", "kind": "function", "line": 21}], "symbolCount": 3, "desc": "", "incoming": 2, "outgoing": 4, "traffic": 6}, {"id": "src/hooks/usePolling.ts", "path": "src/hooks/usePolling.ts", "name": "usePolling.ts", "dir": "src/hooks", "role": "module", "team": "core", "color": "#2dd4bf", "status": "implemented", "size": 896, "degree": 1, "symbols": [{"name": "poll", "kind": "function", "line": 13}], "symbolCount": 1, "desc": "", "incoming": 2, "outgoing": 0, "traffic": 2}, {"id": "src/services/tauri.ts", "path": "src/services/tauri.ts", "name": "tauri.ts", "dir": "src/services", "role": "api", "team": "backend", "color": "#f97316", "status": "implemented", "size": 262, "degree": 5, "symbols": [{"name": "getSystemStats", "kind": "function", "line": 4}, {"name": "mediaKey", "kind": "function", "line": 6}], "symbolCount": 2, "desc": "", "incoming": 7, "outgoing": 5, "traffic": 12}, {"id": "src/services/weather.ts", "path": "src/services/weather.ts", "name": "weather.ts", "dir": "src/services", "role": "api", "team": "backend", "color": "#f97316", "status": "implemented", "size": 3468, "degree": 3, "symbols": [{"name": "weatherCodeInfo", "kind": "function", "line": 33}, {"name": "locate", "kind": "function", "line": 37}, {"name": "getLoc", "kind": "function", "line": 57}, {"name": "getWeather", "kind": "function", "line": 62}], "symbolCount": 4, "desc": "Open-Meteo API + IP geolocation", "incoming": 2, "outgoing": 4, "traffic": 6}, {"id": "src/styles/global.css", "path": "src/styles/global.css", "name": "global.css", "dir": "src/styles", "role": "design", "team": "design", "color": "#ec4899", "status": "implemented", "size": 1283, "degree": 1, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 2, "outgoing": 0, "traffic": 2}, {"id": "src/styles/island.css", "path": "src/styles/island.css", "name": "island.css", "dir": "src/styles", "role": "design", "team": "design", "color": "#ec4899", "status": "implemented", "size": 2958, "degree": 1, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 2, "outgoing": 0, "traffic": 2}, {"id": "src/styles/modules.css", "path": "src/styles/modules.css", "name": "modules.css", "dir": "src/styles", "role": "design", "team": "design", "color": "#ec4899", "status": "implemented", "size": 6987, "degree": 1, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 2, "outgoing": 0, "traffic": 2}, {"id": "src-tauri/build.rs", "path": "src-tauri/build.rs", "name": "build.rs", "dir": "src-tauri", "role": "frontend", "team": "frontend", "color": "#3b82f6", "status": "implemented", "size": 39, "degree": 0, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 0, "outgoing": 0, "traffic": 0}, {"id": "src-tauri/Cargo.toml", "path": "src-tauri/Cargo.toml", "name": "Cargo.toml", "dir": "src-tauri", "role": "config", "team": "infra", "color": "#eab308", "status": "implemented", "size": 518, "degree": 1, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 1, "outgoing": 0, "traffic": 1}, {"id": "src-tauri/tauri.conf.json", "path": "src-tauri/tauri.conf.json", "name": "tauri.conf.json", "dir": "src-tauri", "role": "config", "team": "infra", "color": "#eab308", "status": "implemented", "size": 1465, "degree": 1, "symbols": [], "symbolCount": 0, "desc": "frameless transparent always-on-top window", "incoming": 1, "outgoing": 0, "traffic": 1}, {"id": "src-tauri/capabilities/default.json", "path": "src-tauri/capabilities/default.json", "name": "default.json", "dir": "src-tauri/capabilities", "role": "config", "team": "infra", "color": "#eab308", "status": "implemented", "size": 680, "degree": 0, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 0, "outgoing": 0, "traffic": 0}, {"id": "src-tauri/src/commands.rs", "path": "src-tauri/src/commands.rs", "name": "commands.rs", "dir": "src-tauri/src", "role": "backend", "team": "backend", "color": "#fb7185", "status": "implemented", "size": 3035, "degree": 3, "symbols": [], "symbolCount": 0, "desc": "sysinfo CPU/RAM/Swap/Disk + media key SendKeys via PowerShell", "incoming": 2, "outgoing": 3, "traffic": 5}, {"id": "src-tauri/src/main.rs", "path": "src-tauri/src/main.rs", "name": "main.rs", "dir": "src-tauri/src", "role": "entry", "team": "core", "color": "#8b5cf6", "status": "implemented", "size": 929, "degree": 1, "symbols": [], "symbolCount": 0, "desc": "Tauri v2 entry, registers shell/clipboard plugins + IPC commands", "incoming": 1, "outgoing": 1, "traffic": 2}, {"id": "gitignore", "path": "gitignore", "name": "gitignore", "dir": ".", "role": "module", "team": "core", "color": "#9ca3af", "status": "planned", "size": 0, "degree": 0, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 0, "outgoing": 0, "traffic": 0}, {"id": "src-tauri/icons/icon.ico", "path": "src-tauri/icons/icon.ico", "name": "icon.ico", "dir": "src-tauri/icons", "role": "module", "team": "core", "color": "#9ca3af", "status": "planned", "size": 0, "degree": 0, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 0, "outgoing": 0, "traffic": 0}, {"id": "src-tauri/icons/256x256.png", "path": "src-tauri/icons/256x256.png", "name": "256x256.png", "dir": "src-tauri/icons", "role": "module", "team": "core", "color": "#9ca3af", "status": "planned", "size": 0, "degree": 0, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 0, "outgoing": 0, "traffic": 0}, {"id": "src-tauri/icons/128x128.png", "path": "src-tauri/icons/128x128.png", "name": "128x128.png", "dir": "src-tauri/icons", "role": "module", "team": "core", "color": "#9ca3af", "status": "planned", "size": 0, "degree": 0, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 0, "outgoing": 0, "traffic": 0}, {"id": "src-tauri/icons/32x32.png", "path": "src-tauri/icons/32x32.png", "name": "32x32.png", "dir": "src-tauri/icons", "role": "module", "team": "core", "color": "#9ca3af", "status": "planned", "size": 0, "degree": 0, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 0, "outgoing": 0, "traffic": 0}, {"id": "github/workflows/build.yml", "path": "github/workflows/build.yml", "name": "build.yml", "dir": "github/workflows", "role": "config", "team": "infra", "color": "#9ca3af", "status": "planned", "size": 0, "degree": 2, "symbols": [], "symbolCount": 0, "desc": "", "incoming": 0, "outgoing": 2, "traffic": 2}], "edges": [{"source": "index.html", "target": "src/main.tsx", "type": "reference", "color": "#fbbf24", "label": "", "reverse": "", "bidirectional": false}, {"source": "src/App.tsx", "target": "src/services/tauri.ts", "type": "import", "color": "#60a5fa", "label": "import | reference | invokes IPC", "reverse": "returns data to", "bidirectional": true}, {"source": "src/App.tsx", "target": "src/services/weather.ts", "type": "import", "color": "#60a5fa", "label": "import | reference | fetches weather", "reverse": "", "bidirectional": false}, {"source": "src/App.tsx", "target": "src/hooks/usePolling.ts", "type": "import", "color": "#60a5fa", "label": "import | reference | polls", "reverse": "", "bidirectional": false}, {"source": "src/App.tsx", "target": "src/config.ts", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/App.tsx", "target": "src/types.ts", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/App.tsx", "target": "src/components/Island.tsx", "type": "import", "color": "#60a5fa", "label": "import | reference | renders", "reverse": "", "bidirectional": false}, {"source": "src/main.tsx", "target": "src/App.tsx", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/main.tsx", "target": "src/styles/global.css", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/main.tsx", "target": "src/styles/island.css", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/main.tsx", "target": "src/styles/modules.css", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/components/ClockWeather.tsx", "target": "src/types.ts", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/components/Island.tsx", "target": "src/types.ts", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/components/Island.tsx", "target": "src/components/icons.tsx", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/components/Island.tsx", "target": "src/components/ClockWeather.tsx", "type": "import", "color": "#60a5fa", "label": "import | reference | embeds", "reverse": "", "bidirectional": false}, {"source": "src/components/Island.tsx", "target": "src/components/SystemStats.tsx", "type": "import", "color": "#60a5fa", "label": "import | reference | embeds", "reverse": "", "bidirectional": false}, {"source": "src/components/Island.tsx", "target": "src/components/MusicPanel.tsx", "type": "import", "color": "#60a5fa", "label": "import | reference | embeds", "reverse": "", "bidirectional": false}, {"source": "src/components/Island.tsx", "target": "src/components/Notifications.tsx", "type": "import", "color": "#60a5fa", "label": "import | reference | embeds", "reverse": "", "bidirectional": false}, {"source": "src/components/Island.tsx", "target": "src/components/QuickActions.tsx", "type": "import", "color": "#60a5fa", "label": "import | reference | embeds", "reverse": "", "bidirectional": false}, {"source": "src/components/MusicPanel.tsx", "target": "src/services/tauri.ts", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/components/MusicPanel.tsx", "target": "src/components/icons.tsx", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/components/MusicPanel.tsx", "target": "src/types.ts", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/components/Notifications.tsx", "target": "src/components/icons.tsx", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/components/Notifications.tsx", "target": "src/types.ts", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/components/QuickActions.tsx", "target": "src/components/icons.tsx", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/components/QuickActions.tsx", "target": "src/services/tauri.ts", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/components/SystemStats.tsx", "target": "src/types.ts", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/components/SystemStats.tsx", "target": "src/components/icons.tsx", "type": "import", "color": "#60a5fa", "label": "import | reference | uses", "reverse": "", "bidirectional": false}, {"source": "src/services/tauri.ts", "target": "src/types.ts", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/services/weather.ts", "target": "src/config.ts", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src/services/weather.ts", "target": "src/types.ts", "type": "import", "color": "#60a5fa", "label": "import | reference", "reverse": "", "bidirectional": false}, {"source": "src-tauri/src/main.rs", "target": "src-tauri/src/commands.rs", "type": "declared", "color": "#a78bfa", "label": "registers commands", "reverse": "serves IPC", "bidirectional": true}, {"source": "src/services/tauri.ts", "target": "src-tauri/src/commands.rs", "type": "declared", "color": "#a78bfa", "label": "IPC calls", "reverse": "serves", "bidirectional": true}, {"source": "src-tauri/src/commands.rs", "target": "src-tauri/tauri.conf.json", "type": "declared", "color": "#a78bfa", "label": "uses window config", "reverse": "", "bidirectional": false}, {"source": "src/components/ClockWeather.tsx", "target": "src/components/icons.tsx", "type": "declared", "color": "#a78bfa", "label": "uses", "reverse": "", "bidirectional": false}, {"source": "github/workflows/build.yml", "target": "src-tauri/Cargo.toml", "type": "declared", "color": "#a78bfa", "label": "builds", "reverse": "", "bidirectional": false}, {"source": "github/workflows/build.yml", "target": "package.json", "type": "declared", "color": "#a78bfa", "label": "npm ci", "reverse": "", "bidirectional": false}]};
+</script>
+<script>
+"use strict";
+const cvs=document.getElementById("cv"),ctx=cvs.getContext("2d");
+const tip=document.getElementById("tip");
+const $=id=>document.getElementById(id);
+const TAU=Math.PI*2;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+// ---- data ----
+const byId={};
+const nodes=FT.nodes.map(n=>{const o=Object.assign({},n,{x:0,y:0,vx:0,vy:0,depth:0});byId[o.id]=o;return o;});
+const links=FT.edges.map(e=>{const s=byId[e.source],t=byId[e.target];
+  return s&&t?{source:s,target:t,type:e.type,color:e.color,label:e.label||"",
+    reverse:e.reverse||"",bidirectional:!!e.bidirectional}:null;}).filter(Boolean);
+function radFor(n){return clamp(5+n.degree*1.3,5,19);}
+const hubs=(()=>{const arr=nodes.slice().sort((a,b)=>b.traffic-a.traffic)
+  .slice(0,Math.min(6,nodes.length));return new Set(arr.map(n=>n.id));})();
+
+// ---- adjacency + depth (brief BFS from the entry point) ----
+const adj={};nodes.forEach(n=>adj[n.id]=[]);
+links.forEach(l=>{adj[l.source.id].push(l.target);adj[l.target.id].push(l.source);});
+(function breadth(){
+  let start=nodes.find(n=>n.role==="entry")
+       ||nodes.find(n=>/^(main|app|index|server|cli|run)([.]|$)/.test(n.name))
+       ||nodes[0];
+  if(!start)return;
+  const seen=new Set([start.id]);start.depth=0;
+  const q=[start];
+  while(q.length){const n=q.shift();
+    for(const m of adj[n.id]){if(!seen.has(m.id)){seen.add(m.id);m.depth=n.depth+1;q.push(m);}}}
+  const maxD=nodes.reduce((a,n)=>Math.max(a,n.depth),0);
+  nodes.forEach(n=>{if(n.status==="planned")n.depth=Math.max(n.depth,maxD+1);});
+})();
+
+// ---- initial positions: nodes of the same depth spread evenly on a ring ----
+(function seed(){
+  const byD={};nodes.forEach(n=>{(byD[n.depth]=byD[n.depth]||[]).push(n);});
+  for(const dep in byD){
+    const arr=byD[dep],rr=95+(+dep)*115,base=(+dep)*0.17;
+    arr.forEach((n,idx)=>{const a=base+(idx/arr.length)*TAU+Math.random()*0.08;
+      n.x=Math.cos(a)*rr;n.y=Math.sin(a)*rr;});
+  }
+})();
+
+// ---- camera ----
+let W=innerWidth,H=innerHeight;
+let scale=0.85,ox=W/2,oy=H/2+40;
+let hovered=null,selected=null;
+function toWorld(cx,cy){return{x:(cx-ox)/scale,y:(cy-oy)/scale};}
+const PAD=16;
+
+// ---- force simulation (neural-network feel, with collision prevention) ----
+let alpha=1,alphaMin=0.014,running=false,flow=0;
+function step(){
+  const k=clamp(alpha,0,1);
+  for(const l of links){
+    const dx=l.target.x-l.source.x,dy=l.target.y-l.source.y;
+    const dist=Math.sqrt(dx*dx+dy*dy)||1e-6;
+    const ideal=78+Math.abs(l.target.depth-l.source.depth)*46+Math.min(l.source.degree,l.target.degree)*3;
+    const f=(dist-ideal)/dist*0.055*k;
+    l.source.vx+=dx*f;l.source.vy+=dy*f;l.target.vx-=dx*f;l.target.vy-=dy*f;
+  }
+  const LARGE=(nodes.length>160), SMP=36;
+  const repel=(a,b)=>{
+    const dx=a.x-b.x,dy=a.y-b.y;
+    const d2=Math.max(dx*dx+dy*dy,0.3);
+    const dist=Math.sqrt(d2);
+    const minD=radFor(a)+radFor(b)+PAD;
+    const rMult=(a.role==="docs"?0.4:1)*(b.role==="docs"?0.4:1);
+    let F=2600/d2*rMult;
+    if(dist<minD)F+=(minD-dist)*0.9*rMult+160/dist;
+    F*=k;
+    const mag=Math.min(F,22);
+    const ux=dx/dist,uy=dy/dist;
+    a.vx+=ux*mag;a.vy+=uy*mag;b.vx-=ux*mag;b.vy-=uy*mag;
+  };
+  if(LARGE){
+    for(let i=0;i<nodes.length;i++){
+      const a=nodes[i];
+      for(let s=0;s<SMP;s++){
+        const j=(i+1+s+(s*2654435761>>>0)+(i*536870912>>>0))%nodes.length;
+        if(j===i)continue;
+        repel(a,nodes[j]);
+      }
+    }
+  }else{
+    for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){
+      repel(nodes[i],nodes[j]);
+    }
+  }
+  for(const n of nodes){
+    const ring=95+n.depth*115;
+    const d=Math.sqrt(n.x*n.x+n.y*n.y)||1e-6;
+    const f=(ring-d)*0.012*k;
+    n.vx+=n.x/d*f;n.vy+=n.y/d*f;
+    n.vx+=-n.x*0.0012*k;n.vy+=-n.y*0.0012*k;
+    n.vx=clamp(n.vx,-24,24);n.vy=clamp(n.vy,-24,24);
+    n.x+=n.vx;n.y+=n.vy;
+    n.vx*=0.82;n.vy*=0.82;
+  }
+  alpha*=0.987;
+  flow=(flow+0.6)%28;
+  return alpha>alphaMin;
+}
+function resume(){if(!running){running=true;alpha=Math.max(alpha,0.3);loop();}}
+function loop(){if(alpha>alphaMin){step();draw();requestAnimationFrame(loop);}else{running=false;}}
+
+// ---- interaction state ----
+function nl(id){const s=new Set([id]);links.forEach(l=>{if(l.source.id===id)s.add(l.target.id);if(l.target.id===id)s.add(l.source.id);});return s;}
+
+function tri(x,y,ux,uy,s){
+  ctx.beginPath();
+  ctx.moveTo(x+ux*s,y+uy*s);
+  ctx.lineTo(x-uy*s,y+ux*s);
+  ctx.lineTo(x+uy*s,y-ux*s);
+  ctx.closePath();ctx.fill();
+}
+
+function draw(){
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,W,H);
+  ctx.setTransform(scale,0,0,scale,ox,oy);
+  const isel=selected?nl(selected):null;
+  ctx.globalAlpha=1;
+  for(const l of links){
+    let lit=true;
+    if(isel)lit=isel.has(l.source.id)&&isel.has(l.target.id);
+    ctx.globalAlpha=isel?(lit?0.55:0.05):0.3;
+    ctx.strokeStyle=l.color;ctx.lineWidth=1.1/scale;
+    ctx.setLineDash([7,11]);ctx.lineDashOffset=flow*(l.source.id.length%4+1)*0.6;
+    ctx.beginPath();ctx.moveTo(l.source.x,l.source.y);ctx.lineTo(l.target.x,l.target.y);ctx.stroke();
+    ctx.setLineDash([]);
+    const dx=l.target.x-l.source.x,dy=l.target.y-l.source.y;
+    const dist=Math.sqrt(dx*dx+dy*dy)||1e-6;
+    const ux=dx/dist,uy=dy/dist;
+    const s1=5/scale;
+    ctx.fillStyle=l.color;
+    const tr=radFor(l.target);
+    const ax=l.target.x-ux*tr,ay=l.target.y-uy*tr;
+    tri(ax,ay,ux,uy,s1);
+    if(l.bidirectional){
+      const sr=radFor(l.source);
+      const sx=l.source.x+ux*sr,sy=l.source.y+uy*sr;
+      tri(sx,sy,ux,uy,s1);
+    }
+  }
+  const showLabels=nodes.length<=70||scale>0.9;
+  ctx.textAlign="center";
+  for(const n of nodes){
+    let a=1;
+    if(isel)a=isel.has(n.id)?1:0.13;
+    else if(hovered&&hovered.id!==n.id)a=0.8;
+    drawNode(n,a,showLabels);
+  }
+  ctx.globalAlpha=0.75;ctx.lineWidth=1.8/scale;ctx.strokeStyle="#fbbf24";
+  ctx.setLineDash([3,4]);
+  for(const n of nodes)if(hubs.has(n.id)){
+    ctx.beginPath();ctx.arc(n.x,n.y,radFor(n)+4/scale,0,TAU);ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.globalAlpha=1;
+}
+
+function drawNode(n,a,showLabels){
+  ctx.globalAlpha=a;
+  const r=radFor(n);
+  if(hovered&&hovered.id===n.id){
+    ctx.globalAlpha=a*0.25;ctx.fillStyle="#ffffff";
+    ctx.beginPath();ctx.arc(n.x,n.y,r+5/scale,0,TAU);ctx.fill();
+    ctx.globalAlpha=a;
+  }
+  ctx.fillStyle=n.color;
+  ctx.beginPath();ctx.arc(n.x,n.y,r,0,TAU);ctx.fill();
+  ctx.lineWidth=n.status==="planned"?1.3/scale:1.7/scale;
+  ctx.setLineDash(n.status==="planned"?[5,4]:[]);
+  ctx.strokeStyle=n.status==="planned"?"rgba(190,200,228,0.9)":"rgba(255,255,255,0.25)";
+  ctx.stroke();ctx.setLineDash([]);
+  if(selected===n.id){
+    ctx.globalAlpha=0.9;ctx.lineWidth=2.2/scale;ctx.strokeStyle="#ffffff";
+    ctx.beginPath();ctx.arc(n.x,n.y,r+3/scale,0,TAU);ctx.stroke();
+  }
+  if(showLabels){
+    ctx.globalAlpha=clamp(scale-0.45,0,1)*a*0.9;
+    ctx.fillStyle="#c9d6f5";
+    ctx.font=(11/scale)+"px 'Segoe UI',system-ui,sans-serif";
+    ctx.fillText(n.name,n.x,n.y+r+14/scale);
+  }
+}
+
+function hitTest(wx,wy){
+  let best=null,bd=1e9;
+  for(const n of nodes){
+    const dx=n.x-wx,dy=n.y-wy,d=dx*dx+dy*dy,r=radFor(n)+4;
+    if(d<r*r&&d<bd){bd=d;best=n;}
+  }
+  return best;
+}
+
+// ---- pointer events ----
+let drag=null,panning=false,p0=null,lm=null,moved=false;
+cvs.addEventListener("pointerdown",e=>{
+  cvs.setPointerCapture(e.pointerId);
+  const wp=toWorld(e.clientX,e.clientY);
+  const hit=hitTest(wp.x,wp.y);
+  p0={x:e.clientX,y:e.clientY};lm={x:e.clientX,y:e.clientY};moved=false;
+  if(hit){drag=hit;drag.fx=drag.x;drag.fy=drag.y;cvs.classList.add("dragging");resume();}
+  else{panning=true;cvs.classList.add("panning");}
+});
+cvs.addEventListener("pointermove",e=>{
+  if(drag){
+    moved=true;const wp=toWorld(e.clientX,e.clientY);
+    drag.x=wp.x;drag.y=wp.y;drag.fx=drag.x;drag.fy=drag.y;draw();
+  }else if(panning){
+    if(Math.abs(e.clientX-p0.x)+Math.abs(e.clientY-p0.y)>4)moved=true;
+    ox+=e.clientX-lm.x;oy+=e.clientY-lm.y;draw();
+  }else{
+    const wp=toWorld(e.clientX,e.clientY);
+    const h=hitTest(wp.x,wp.y);
+    if(h!==hovered){hovered=h;draw();}
+    if(h){showTip(h,e.clientX,e.clientY);}else{hideTip();}
+  }
+  lm={x:e.clientX,y:e.clientY};
+});
+cvs.addEventListener("pointerup",e=>{
+  if(drag){drag.fx=null;drag.fy=null;drag=null;cvs.classList.remove("dragging");}
+  if(panning){cvs.classList.remove("panning");panning=false;}
+  const d=Math.abs(e.clientX-p0.x)+Math.abs(e.clientY-p0.y);
+  if(d<6){
+    const wp=toWorld(e.clientX,e.clientY);
+    const hit=hitTest(wp.x,wp.y);
+    if(hit){selected=selected===hit.id?null:hit.id;}else{selected=null;}
+    buildList();draw();
+  }
+  moved=false;
+});
+cvs.addEventListener("wheel",e=>{
+  e.preventDefault();
+  const w=toWorld(e.clientX,e.clientY);
+  const f=Math.pow(1.0015,-e.deltaY);
+  scale=clamp(scale*f,0.15,4);
+  ox=e.clientX-w.x*scale;oy=e.clientY-w.y*scale;
+  draw();
+},{passive:false});
+
+// ---- tooltip (relative view: outgoing / incoming, reverse labels, symbols) ----
+function symHtml(s){
+  const col=s.kind==="class"?"#f472b6":"#93c5fd";
+  return `<div class="kv" style="opacity:.85"><span style="color:${col}">${s.kind}</span> ${esc(s.name)} <span style="opacity:.5">:${s.line}</span></div>`;
+}
+function showTip(n,cx,cy){
+  const out=links.filter(l=>l.source.id===n.id);
+  const inc=links.filter(l=>l.target.id===n.id);
+  let h="<b>"+esc(n.path)+"</b><br>"
+    +`<span class="pill" style="border-left:3px solid ${n.color}">${n.role}</span>`
+    +`<span class="pill">${n.status}</span>`
+    +`<span class="pill">${n.team}</span>`
+    +`<div class="kv"><b>traffic:</b> in ${n.incoming} | out ${n.outgoing} | total ${n.traffic} | depth ${n.depth} | sym ${n.symbolCount}</div>`;
+  if(n.desc)h+=`<div class="kv"><b>note:</b> ${esc(n.desc)}</div>`;
+  if(out.length){
+    h+='<div class="grp">outgoing</div>'
+      +out.slice(0,8).map(l=>{
+        const lab=l.label?` <i>(${esc(l.label)})</i>`:"";
+        return `<div class="kv">${esc(l.type)} <span style="color:${l.color}">→</span> ${esc(l.target.name)}${lab}</div>`;
+      }).join("");
+    if(out.length>8)h+=`<div class="kv" style="opacity:.6">+${out.length-8} more</div>`;
+  }
+  if(inc.length){
+    h+='<div class="grp">incoming</div>'
+      +inc.slice(0,8).map(l=>{
+        const lab=(l.reverse&&l.reverse!=="")?` <i>(${esc(l.reverse)})</i>`:(l.label?` <i>(${esc(l.label)})</i>`:"");
+        return `<div class="kv"><span style="color:${l.color}">←</span> ${esc(l.source.name)} · ${esc(l.type)}${lab}</div>`;
+      }).join("");
+    if(inc.length>8)h+=`<div class="kv" style="opacity:.6">+${inc.length-8} more</div>`;
+  }
+  if(n.symbols&&n.symbols.length){
+    h+='<div class="grp">symbols ('+n.symbolCount+')</div>'
+      +n.symbols.slice(0,12).map(symHtml).join("");
+    if(n.symbols.length>12)h+=`<div class="kv" style="opacity:.6">+${n.symbols.length-12} more</div>`;
+  }
+  tip.innerHTML=h;tip.style.display="block";
+  const tw=tip.offsetWidth,th=tip.offsetHeight;
+  tip.style.left=Math.min(cx+14,innerWidth-tw-10)+"px";
+  tip.style.top=Math.min(cy+14,innerHeight-th-10)+"px";
+}
+function hideTip(){tip.style.display="none";}
+
+// ---- sidebar (grouped by team, like a company org) ----
+function buildList(){
+  const q=($("q").value||"").toLowerCase();
+  const el=$("list");el.innerHTML="";
+  if(!nodes.length){el.innerHTML='<div style="color:var(--muted);padding:10px">no files yet</div>';return;}
+  const byT={};FT.teams.forEach(t=>byT[t]=[]);
+  nodes.forEach(n=>{(byT[n.team]=byT[n.team]||[]).push(n);});
+  for(const team of FT.teams){
+    const arr=(byT[team]||[]).slice().sort((a,b)=>a.path.localeCompare(b.path));
+    const flt=arr.filter(n=>!q||n.path.toLowerCase().includes(q));
+    if(!flt.length)continue;
+    const hd=document.createElement("div");
+    hd.className="team";
+    hd.innerHTML=`<span class="dot" style="background:#5b6ea8"></span>${team}<em>${flt.length}</em>`;
+    el.appendChild(hd);
+    for(const n of flt){
+      const row=document.createElement("div");
+      row.className="row"+(n.status==="planned"?" planned":"")+(selected===n.id?" active":"");
+      const stb=n.status==="planned"?"· planned":(n.traffic?`· ${n.traffic} trf`:"");
+      row.innerHTML=`<span class="dot" title="${n.role}" style="background:${n.color};${n.status==='planned'?"box-shadow:inset 0 0 0 2px rgba(255,255,255,.3)":""}"></span>`
+        +`<span class="nm" title="${esc(n.path)}">${esc(n.path)}</span>`
+        +`<span class="st">${n.role}${stb}</span>`;
+      row.onclick=()=>focusNode(n);
+      el.appendChild(row);
+    }
+  }
+}
+function focusNode(n){
+  selected=n.id;scale=clamp(Math.max(scale,1.35),0.15,4);
+  ox=W/2-n.x*scale;oy=H/2-n.y*scale;
+  buildList();draw();
+}
+function resetView(){
+  scale=0.85;ox=W/2;oy=H/2+40;selected=null;hovered=null;resume();
+}
+$("q").addEventListener("input",buildList);
+$("rst").addEventListener("click",resetView);
+cvs.addEventListener("dblclick",e=>{
+  const wp=toWorld(e.clientX,e.clientY);
+  if(!hitTest(wp.x,wp.y))resetView();
+});
+$("ver").textContent="flowtree · v"+FT.exporter+" · "+(FT.generated||"");
+
+// ---- traffic tabs: ingoing / outgoing / total traffic per file ----
+let trafficMode="in";
+const TRAFFIC_ROWS=68;
+function renderTraffic(){
+  const key=trafficMode==="in"?"incoming":(trafficMode==="out"?"outgoing":"traffic");
+  const sorted=nodes.slice().filter(n=>n[key]>0)
+    .sort((a,b)=>b[key]-a[key]).slice(0,TRAFFIC_ROWS);
+  const max=Math.max(1,...sorted.map(n=>n[key]));
+  const el=$("tlist");el.innerHTML="";
+  const q=($("q").value||"").toLowerCase();
+  const rows=sorted.filter(n=>!q||n.path.toLowerCase().includes(q));
+  if(!rows.length){
+    el.innerHTML='<div style="color:var(--muted);padding:14px">no traffic in this direction yet — build some links and re-run the exporter</div>';
+    return;
+  }
+  let rank=0;
+  for(const n of rows){
+    rank++;
+    const row=document.createElement("div");
+    row.className="trow";
+    const outPct=Math.round(n.outgoing/max*100);
+    const inPct=Math.round(n.incoming/max*100);
+    const barTot=Math.round(n.traffic/max*100);
+    row.innerHTML=`<div class="rank">${rank}</div>`
+      +`<div class="pid"><span style="color:${n.color}">●</span> ${esc(n.path)}<span class="role">${n.role} · ${n.team}</span></div>`
+      +`<div class="bars">`
+      +  (trafficMode!=="in"?`<div class="bar out" title="outgoing"><i style="width:${outPct}%"></i></div>`:"")
+      +  (trafficMode!=="out"?`<div class="bar in" title="ingoing"><i style="width:${inPct}%"></i></div>`:"")
+      +  `<div class="bar" title="total"><i style="width:${barTot}%;background:#a78bfa"></i></div>`
+      +`</div>`
+      +`<div class="val"><span>☚ <b class="ot">${n.outgoing}</b></span><span>☛ <b class="it">${n.incoming}</b></span><span>total <b>${n.traffic}</b></span></div>`;
+    row.onclick=()=>{showTab("graph");focusNode(n);};
+    el.appendChild(row);
+  }
+}
+function showTab(t){
+  const g=t==="graph";
+  $("cv").style.display=g?"block":"none";
+  $("traffic").classList.toggle("hidden",g);
+  $("tabGraph").classList.toggle("act",g);
+  $("tabTraffic").classList.toggle("act",!g);
+  if(!g)renderTraffic();
+  if(g){resize();resume();}
+}
+$("tabGraph").addEventListener("click",()=>showTab("graph"));
+$("tabTraffic").addEventListener("click",()=>showTab("traffic"));
+$("ttIn").addEventListener("click",()=>{trafficMode="in";$("ttIn").classList.add("act");
+  $("ttOut").classList.remove("act");$("ttTotal").classList.remove("act");renderTraffic();});
+$("ttOut").addEventListener("click",()=>{trafficMode="out";$("ttOut").classList.add("act");
+  $("ttIn").classList.remove("act");$("ttTotal").classList.remove("act");renderTraffic();});
+$("ttTotal").addEventListener("click",()=>{trafficMode="total";$("ttTotal").classList.add("act");
+  $("ttIn").classList.remove("act");$("ttOut").classList.remove("act");renderTraffic();});
+
+// ---- header + legend ----
+function resize(){W=cvs.width=window.innerWidth;H=cvs.height=window.innerHeight;ox=W/2;oy=H/2+40;draw();}
+addEventListener("resize",resize);resize();
+$("pname").textContent=FT.project||"flowtree";
+$("sTraf").innerHTML="<b>"+(FT.counts.traffic||0)+"</b> traffic";
+$("sNode").innerHTML="<b>"+FT.counts.nodes+"</b> nodes";
+$("sEdge").innerHTML="<b>"+FT.counts.edges+"</b> links";
+$("sPlan").innerHTML="<b>"+FT.counts.planned+"</b> planned";
+$("sSym").innerHTML="<b>"+FT.counts.symbols+"</b> symbols";
+$("sTime").textContent=FT.generated||"";
+(function legend(){
+  const el=$("legend");
+  let h="<h5>ecosystem</h5>";
+  h+='<div class="lg"><span class="dot" style="background:transparent;border:1.5px dashed #9ca3af"></span><span>planned (no file yet)</span></div>';
+  for(const r of FT.roles)h+=`<div class="lg"><span class="dot" style="background:${FT.roleColors[r]}"></span><span>${r}</span></div>`;
+  for(const k in FT.edgeColors)h+=`<div class="lg"><span class="edge" style="border-color:${FT.edgeColors[k]}"></span><span>${k}</span></div>`;
+  h+='<div class="lg"><span class="bidir" style="border-color:#a78bfa"></span><span>&lt;-&gt; bidirectional</span></div>';
+  h+='<div class="lg" style="margin-top:4px"><span><b>teams:</b> '+FT.teams.join(" · ")+'</span></div>';
+  el.innerHTML=h;
+})();
+
+buildList();
+draw();
+loop();
+</script>
+</body>
+</html>

@@ -1,0 +1,153 @@
+{
+  "title": "Dynamic Island for PC",
+  "roles": {
+    "src/main.tsx": "entry",
+    "src/App.tsx": "entry",
+    "src-tauri/src/main.rs": "entry",
+    "src/services/tauri.ts": "api",
+    "src/services/weather.ts": "api",
+    "src-tauri/src/commands.rs": "backend",
+    "src/styles/global.css": "design",
+    "src/styles/island.css": "design",
+    "src/styles/modules.css": "design",
+    "src/components/icons.tsx": "design",
+    "src-tauri/tauri.conf.json": "config",
+    "src-tauri/capabilities/default.json": "config",
+    ".github/workflows/build.yml": "infra",
+    "scripts/generate-icons.ps1": "infra",
+    "src/types.ts": "module"
+  },
+  "links": [
+    {
+      "from": "src-tauri/src/main.rs",
+      "to": "src-tauri/src/commands.rs",
+      "label": "registers commands",
+      "reverse": "serves IPC"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/services/tauri.ts",
+      "label": "invokes IPC",
+      "bidirectional": true,
+      "reverse": "returns data to"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/services/weather.ts",
+      "label": "fetches weather"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/components/Island.tsx",
+      "label": "renders"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/hooks/usePolling.ts",
+      "label": "polls"
+    },
+    {
+      "from": "src/components/Island.tsx",
+      "to": "src/components/MusicPanel.tsx",
+      "label": "embeds"
+    },
+    {
+      "from": "src/components/Island.tsx",
+      "to": "src/components/SystemStats.tsx",
+      "label": "embeds"
+    },
+    {
+      "from": "src/components/Island.tsx",
+      "to": "src/components/Notifications.tsx",
+      "label": "embeds"
+    },
+    {
+      "from": "src/components/Island.tsx",
+      "to": "src/components/QuickActions.tsx",
+      "label": "embeds"
+    },
+    {
+      "from": "src/components/Island.tsx",
+      "to": "src/components/ClockWeather.tsx",
+      "label": "embeds"
+    },
+    {
+      "from": "src/services/tauri.ts",
+      "to": "src-tauri/src/commands.rs",
+      "label": "IPC calls",
+      "bidirectional": true,
+      "reverse": "serves"
+    },
+    {
+      "from": "src-tauri/src/commands.rs",
+      "to": "src-tauri/tauri.conf.json",
+      "label": "uses window config"
+    },
+    {
+      "from": "src/components/SystemStats.tsx",
+      "to": "src/components/icons.tsx",
+      "label": "uses"
+    },
+    {
+      "from": "src/components/ClockWeather.tsx",
+      "to": "src/components/icons.tsx",
+      "label": "uses"
+    },
+    {
+      "from": ".github/workflows/build.yml",
+      "to": "src-tauri/Cargo.toml",
+      "label": "builds"
+    },
+    {
+      "from": ".github/workflows/build.yml",
+      "to": "package.json",
+      "label": "npm ci"
+    }
+  ],
+  "planned": [
+    "src/main.tsx",
+    "src/App.tsx",
+    "src/config.ts",
+    "src/types.ts",
+    "src/components/Island.tsx",
+    "src/components/MusicPanel.tsx",
+    "src/components/SystemStats.tsx",
+    "src/components/Notifications.tsx",
+    "src/components/QuickActions.tsx",
+    "src/components/ClockWeather.tsx",
+    "src/components/icons.tsx",
+    "src/hooks/usePolling.ts",
+    "src/services/tauri.ts",
+    "src/services/weather.ts",
+    "src/styles/global.css",
+    "src/styles/island.css",
+    "src/styles/modules.css",
+    "index.html",
+    "package.json",
+    "tsconfig.json",
+    "tsconfig.node.json",
+    "vite.config.ts",
+    ".gitignore",
+    "README.md",
+    "src-tauri/Cargo.toml",
+    "src-tauri/build.rs",
+    "src-tauri/tauri.conf.json",
+    "src-tauri/capabilities/default.json",
+    "src-tauri/src/main.rs",
+    "src-tauri/src/commands.rs",
+    "src-tauri/icons/icon.ico",
+    "src-tauri/icons/256x256.png",
+    "src-tauri/icons/128x128.png",
+    "src-tauri/icons/32x32.png",
+    ".github/workflows/build.yml",
+    "scripts/generate-icons.ps1"
+  ],
+  "notes": {
+    "src-tauri/src/main.rs": "Tauri v2 entry, registers shell/clipboard plugins + IPC commands",
+    "src-tauri/src/commands.rs": "sysinfo CPU/RAM/Swap/Disk + media key SendKeys via PowerShell",
+    "src-tauri/tauri.conf.json": "frameless transparent always-on-top window",
+    "src/App.tsx": "island state machine: collapsed ↔ expanded",
+    "src/services/weather.ts": "Open-Meteo API + IP geolocation",
+    ".github/workflows/build.yml": "GitHub Actions builds .exe on cloud (no local Rust needed)"
+  }
+}
