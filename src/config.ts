@@ -1,6 +1,6 @@
 export const CONFIG = {
   collapsed: { width: 226, height: 64 },
-  expanded: { width: 432, height: 400 },
+  expanded: { width: 432, height: 470 },
   statsUpdateMs: 1500,
   weatherUpdateMs: 60_000,
   weatherApi: "https://api.open-meteo.com/v1/forecast",
